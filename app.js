@@ -660,25 +660,25 @@ function diagnose(data) {
   let kicker;
   let summary;
   if (distress >= 55 && viability >= 55) {
-    title = "회생절차 검토 가치가";
-    emphasis = "높습니다";
-    kicker = "회생절차 검토 구간";
-    summary = "재무적 위기는 확인되지만 영업과 현금창출 기반이 남아 있어, 채무조정 후 계속기업가치를 검토할 실익이 있습니다.";
+    title = "법인회생절차를";
+    emphasis = "구체적으로 검토할 단계입니다";
+    kicker = "법원 회생절차 우선 검토 구간";
+    summary = "재무적 위기는 확인되지만 영업과 현금창출 기반이 남아 있습니다. 법인회생절차를 통해 채무를 조정했을 때 사업을 계속하고 회생계획을 수행할 여지가 있는지 우선 검토할 구간입니다.";
   } else if (distress >= 55) {
-    title = "긴급한 위기 대응과";
-    emphasis = "사업성 검토가 필요합니다";
+    title = "법인회생·파산 등";
+    emphasis = "긴급한 대안 비교가 필요합니다";
     kicker = "긴급 전문가 검토 구간";
-    summary = "지급불능 위험이 높고 현재 사업성 지표도 약합니다. 보전처분 필요성과 함께 회생·파산·매각 대안을 동시에 비교해야 합니다.";
+    summary = "지급불능 위험이 높고 현재 사업성 지표도 약합니다. 법인회생 신청만으로 정상화가 보장되는 상태는 아니므로, 보전 필요성과 함께 회생·파산·M&A 등 대안을 신속히 비교해야 합니다.";
   } else if (viability >= 55) {
-    title = "자율 구조조정을";
-    emphasis = "먼저 검토하세요";
+    title = "법인회생 신청 전";
+    emphasis = "자율조정을 먼저 검토하세요";
     kicker = "사전 구조조정 검토 구간";
-    summary = "계속기업 가능성은 양호하고 위기 수준은 아직 제한적입니다. 회생신청 전 금융기관 협의, 워크아웃, 비용개선 방안을 우선 검토할 수 있습니다.";
+    summary = "입력값만 보면 계속기업 가능성은 양호하고 위기 신호는 아직 제한적입니다. 법원 절차로 바로 진입하기보다 금융기관 협의, 워크아웃, 비용개선 등 사전 구조조정을 우선 비교할 수 있습니다.";
   } else {
-    title = "종합 상담으로";
-    emphasis = "대안을 비교하세요";
+    title = "추가 자료로";
+    emphasis = "법인회생 가능성을 보완하세요";
     kicker = "추가자료 검토 구간";
-    summary = "현재 입력만으로는 회생절차 적합성을 단정하기 어렵습니다. 채무 만기, 담보, 수주잔고와 자금계획을 추가해 대안을 비교해야 합니다.";
+    summary = "현재 입력만으로는 법원의 법인회생절차를 이용할 가능성을 판단하기 어렵습니다. 채무 만기, 담보, 수주잔고, 현금흐름과 자금계획을 추가해 회생·파산·사적조정 대안을 비교해야 합니다.";
   }
 
   const findings = [];
@@ -692,6 +692,36 @@ function diagnose(data) {
   if (data.attachment === "yes" || data.arrears === "yes") findings.push({ risk: true, text: `연체 또는 집행절차가 확인되어 자금 유출과 채권자 조치에 대한 신속한 대응이 필요합니다.` });
 
   return { equity, currentRatio, debtRatio, operatingMargin, interestCoverage, distress, viability, restructure, fit, title, emphasis, kicker, summary, findings: findings.slice(0, 4) };
+}
+
+function buildResultExplanation(data, result) {
+  const scoreExplanation = [
+    `종합 검토지수 ${result.fit}점은 법원의 개시·인가 확률이 아닙니다.`,
+    `지급불능 위험 ${result.distress}점, 계속기업 가능성 ${result.viability}점, 구조조정 여력 ${result.restructure}점을 함께 반영해 법인회생절차를 얼마나 우선적으로 검토해야 하는지 보여주는 내부 예비지표입니다.`,
+  ].join(" ");
+
+  const liquidityExplanation = Number.isFinite(result.currentRatio)
+    ? (result.currentRatio < 100
+        ? `유동비율은 ${pct(result.currentRatio)}로 유동자산보다 단기 상환부담이 커, 가까운 시기의 자금압박 가능성을 확인해야 합니다.`
+        : `유동비율은 ${pct(result.currentRatio)}로 단기채무에 대응할 장부상 유동자산은 비교적 확보되어 있습니다.`)
+    : "유동부채가 입력되지 않아 단기 유동성은 판단하지 못했습니다.";
+  const capitalExplanation = result.equity < 0
+    ? `입력 단위 기준 부채가 자산보다 ${Math.abs(result.equity).toLocaleString("ko-KR")} 많아 자본잠식 여부와 실제 자산가치 확인이 중요합니다.`
+    : `입력 단위 기준 자산이 부채보다 ${result.equity.toLocaleString("ko-KR")} 많아 장부상 순자산이 남아 있습니다.`;
+  const profitExplanation = data.operatingProfit > 0
+    ? `영업이익률은 ${pct(result.operatingMargin)}로 본업의 수익이 발생하고 있어 사업 계속 가능성을 뒷받침합니다.`
+    : `영업이익률은 ${pct(result.operatingMargin)}로 손익개선 계획과 매출 전망을 추가로 확인해야 합니다.`;
+  const interestExplanation = Number.isFinite(result.interestCoverage)
+    ? `이자보상배율은 ${multiple(result.interestCoverage)}로 영업이익이 이자비용을 어느 정도 감당하는지 보여줍니다.`
+    : "이자비용이 없거나 입력되지 않아 이자상환능력은 별도로 판단하지 않았습니다.";
+  const financialExplanation = [liquidityExplanation, capitalExplanation, profitExplanation, interestExplanation].join(" ");
+
+  const procedureExplanation = [
+    "법인회생은 재정적 어려움에 처한 회사의 채무관계를 법원 감독 아래 조정해 사업의 계속과 변제를 도모하는 절차입니다.",
+    "실제 신청 가능성과 회생계획 인가 가능성을 검토하려면 최근 매출·수주 전망, 13주 자금수지, 채권자와 담보 구조, 청산가치와 계속기업가치, 수행 가능한 변제계획을 추가로 확인해야 합니다.",
+  ].join(" ");
+
+  return { scoreExplanation, financialExplanation, procedureExplanation };
 }
 
 function renderResult(data, result) {
@@ -725,6 +755,11 @@ function renderResult(data, result) {
   $("#findings-list").innerHTML = result.findings
     .map((finding) => `<li class="${finding.risk ? "risk" : "positive"}">${finding.text}</li>`)
     .join("");
+
+  const explanation = buildResultExplanation(data, result);
+  $("#result-score-explanation").textContent = explanation.scoreExplanation;
+  $("#result-financial-explanation").textContent = explanation.financialExplanation;
+  $("#result-procedure-explanation").textContent = explanation.procedureExplanation;
 }
 
 form.addEventListener("submit", (event) => {
