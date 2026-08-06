@@ -119,6 +119,7 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rg
 .amount-input { position: relative; }
 .amount-input input { padding-right: 64px; text-align: right; }
 .amount-input i { position: absolute; top: 15px; right: 11px; color: #9ba6a2; font-size: 8px; font-style: normal; pointer-events: none; }
+.amount-korean { display: block; min-height: 20px; margin-top: 5px; color: var(--green); font-size: 13px; font-weight: 600; line-height: 1.4; text-align: right; word-break: keep-all; }
 .situation-title { margin-top: 38px; }
 .situation-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 fieldset { margin: 0; padding: 15px 16px; border: 1px solid var(--line); border-radius: 11px; }
@@ -280,6 +281,7 @@ input[type="text"], input[type="number"], input[inputmode="decimal"], select { f
 .form-section-title span { font-size: 13px; }
 .amount-input input { padding-right: 84px; font-variant-numeric: tabular-nums; }
 .amount-input i { top: 13px; font-size: 12px; }
+.amount-korean { font-size: 14px; }
 legend { font-size: 14px; }
 .choice-pills span { font-size: 14px; }
 .form-actions p { font-size: 13px; }
