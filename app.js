@@ -650,35 +650,42 @@ function diagnose(data) {
   if (equity < 0) restructure -= 6;
   restructure = Math.round(clamp(restructure));
 
-  let fit = Math.round(8 + distress * 0.47 + viability * 0.33 + restructure * 0.12);
-  if (viability < 35) fit = Math.min(fit, 54);
-  if (distress < 35) fit = Math.min(fit, 62);
-  fit = clamp(fit, 10, 94);
+  const needScore = distress;
+  let passScore = Math.round(viability * 0.55 + restructure * 0.35 + 10);
+  if (equity < 0) passScore -= 4;
+  if (Number.isFinite(currentRatio) && currentRatio < 50) passScore -= 5;
+  if (data.businessContinuing === "no") passScore -= 10;
+  if (data.operatingProfit < 0) passScore -= 8;
+  if (data.operatingCashFlow < 0) passScore -= 8;
+  if (data.arrears === "yes") passScore -= 3;
+  if (data.attachment === "yes") passScore -= 6;
+  if (data.taxArrears === "yes") passScore -= 4;
+  passScore = Math.round(clamp(passScore, 5, 95));
 
   let title;
   let emphasis;
   let kicker;
   let summary;
-  if (distress >= 55 && viability >= 55) {
-    title = "법인회생절차를";
-    emphasis = "구체적으로 검토할 단계입니다";
-    kicker = "법원 회생절차 우선 검토 구간";
-    summary = "재무적 위기는 확인되지만 영업과 현금창출 기반이 남아 있습니다. 법인회생절차를 통해 채무를 조정했을 때 사업을 계속하고 회생계획을 수행할 여지가 있는지 우선 검토할 구간입니다.";
-  } else if (distress >= 55) {
-    title = "법인회생·파산 등";
-    emphasis = "긴급한 대안 비교가 필요합니다";
-    kicker = "긴급 전문가 검토 구간";
-    summary = "지급불능 위험이 높고 현재 사업성 지표도 약합니다. 법인회생 신청만으로 정상화가 보장되는 상태는 아니므로, 보전 필요성과 함께 회생·파산·M&A 등 대안을 신속히 비교해야 합니다.";
-  } else if (viability >= 55) {
-    title = "법인회생 신청 전";
-    emphasis = "자율조정을 먼저 검토하세요";
-    kicker = "사전 구조조정 검토 구간";
-    summary = "입력값만 보면 계속기업 가능성은 양호하고 위기 신호는 아직 제한적입니다. 법원 절차로 바로 진입하기보다 금융기관 협의, 워크아웃, 비용개선 등 사전 구조조정을 우선 비교할 수 있습니다.";
+  if (needScore >= 60 && passScore >= 60) {
+    title = "법인회생 필요성이 높고";
+    emphasis = "신청 통과 가능성도 있습니다";
+    kicker = "법인회생 우선 검토 구간";
+    summary = `법인회생 필요성은 ${needScore}점, 신청 통과 가능성은 ${passScore}점입니다. 재무적 위기와 신청 필요성이 확인되며, 영업 지속성과 채무조정 여력도 남아 있어 전문가와 구체적인 신청 준비를 검토할 수 있습니다.`;
+  } else if (needScore >= 60) {
+    title = "법인회생 필요성은 높지만";
+    emphasis = "통과 가능성 보완이 필요합니다";
+    kicker = "긴급 보완 검토 구간";
+    summary = `법인회생 필요성은 ${needScore}점으로 높지만 신청 통과 가능성은 ${passScore}점입니다. 신청 전에 영업개선안, 자금계획, 채권자 협의와 회생계획 수행재원을 보완해야 합니다.`;
+  } else if (passScore >= 60) {
+    title = "신청 통과 여력은 있으나";
+    emphasis = "현재 필요성은 낮습니다";
+    kicker = "사전 구조조정 우선 구간";
+    summary = `신청 통과 가능성은 ${passScore}점이지만 법인회생 필요성은 ${needScore}점입니다. 현재 위기 수준만 보면 법원 절차보다 금융기관 협의, 워크아웃, 비용개선 등 사전 구조조정을 먼저 비교할 수 있습니다.`;
   } else {
-    title = "추가 자료로";
-    emphasis = "법인회생 가능성을 보완하세요";
-    kicker = "추가자료 검토 구간";
-    summary = "현재 입력만으로는 법원의 법인회생절차를 이용할 가능성을 판단하기 어렵습니다. 채무 만기, 담보, 수주잔고, 현금흐름과 자금계획을 추가해 회생·파산·사적조정 대안을 비교해야 합니다.";
+    title = "법인회생 필요성과";
+    emphasis = "통과 가능성이 모두 낮습니다";
+    kicker = "다른 대안 우선 검토 구간";
+    summary = `법인회생 필요성은 ${needScore}점, 신청 통과 가능성은 ${passScore}점입니다. 현재 입력만으로는 법인회생의 필요성과 신청 실익이 모두 제한적이므로 추가 자료를 확인하고 다른 구조조정 대안과 비교해야 합니다.`;
   }
 
   const findings = [];
@@ -691,14 +698,14 @@ function diagnose(data) {
   if (data.operatingCashFlow > 0) findings.push({ risk: false, text: `영업활동 현금흐름이 양수여서 회생계획 수행재원 검토에 유리합니다.` });
   if (data.attachment === "yes" || data.arrears === "yes") findings.push({ risk: true, text: `연체 또는 집행절차가 확인되어 자금 유출과 채권자 조치에 대한 신속한 대응이 필요합니다.` });
 
-  return { equity, currentRatio, debtRatio, operatingMargin, interestCoverage, distress, viability, restructure, fit, title, emphasis, kicker, summary, findings: findings.slice(0, 4) };
+  return { equity, currentRatio, debtRatio, operatingMargin, interestCoverage, distress, viability, restructure, needScore, passScore, title, emphasis, kicker, summary, findings: findings.slice(0, 4) };
 }
 
 function buildResultExplanation(data, result) {
-  const scoreExplanation = [
-    `종합 검토지수 ${result.fit}점은 법원의 개시·인가 확률이 아닙니다.`,
-    `지급불능 위험 ${result.distress}점, 계속기업 가능성 ${result.viability}점, 구조조정 여력 ${result.restructure}점을 함께 반영해 법인회생절차를 얼마나 우선적으로 검토해야 하는지 보여주는 내부 예비지표입니다.`,
-  ].join(" ");
+  const needLevel = result.needScore >= 70 ? "높은 구간" : result.needScore >= 50 ? "검토 구간" : "낮은 구간";
+  const passLevel = result.passScore >= 70 ? "양호한 구간" : result.passScore >= 50 ? "보완 검토 구간" : "낮은 구간";
+  const needExplanation = `법인회생 필요성은 ${result.needScore}점으로 ${needLevel}입니다. 지급불능 위험, 단기 유동성, 자본잠식, 손익, 연체와 강제집행 여부를 반영해 현재 회사가 법인회생을 얼마나 시급하게 검토해야 하는지 나타냅니다.`;
+  const passExplanation = `신청 통과 가능성은 ${result.passScore}점으로 ${passLevel}입니다. 영업 지속성, 수익성, 현금흐름과 채무조정 여력을 반영한 입력자료 기준 예비점수입니다. 법원의 실제 개시·인가 확률이나 승인 보장을 뜻하지 않습니다.`;
 
   const liquidityExplanation = Number.isFinite(result.currentRatio)
     ? (result.currentRatio < 100
@@ -717,21 +724,25 @@ function buildResultExplanation(data, result) {
   const financialExplanation = [liquidityExplanation, capitalExplanation, profitExplanation, interestExplanation].join(" ");
 
   const procedureExplanation = [
-    "법인회생은 재정적 어려움에 처한 회사의 채무관계를 법원 감독 아래 조정해 사업의 계속과 변제를 도모하는 절차입니다.",
-    "실제 신청 가능성과 회생계획 인가 가능성을 검토하려면 최근 매출·수주 전망, 13주 자금수지, 채권자와 담보 구조, 청산가치와 계속기업가치, 수행 가능한 변제계획을 추가로 확인해야 합니다.",
+    "여기서 ‘통과’는 입력정보를 바탕으로 회생절차 개시와 회생계획 인가에 필요한 사업 지속성 및 계획 수행 여력을 미리 점검한다는 뜻입니다.",
+    "실제 법원 판단에는 최근 매출·수주 전망, 13주 자금수지, 채권자 동의 가능성, 담보 구조, 청산가치와 계속기업가치, 공정하고 수행 가능한 변제계획을 추가로 확인해야 합니다.",
   ].join(" ");
 
-  return { scoreExplanation, financialExplanation, procedureExplanation };
+  return { needExplanation, passExplanation, financialExplanation, procedureExplanation };
 }
 
 function renderResult(data, result) {
   $("#result-kicker").textContent = result.kicker;
   $("#result-title").innerHTML = `${result.title} <em>${result.emphasis}</em>`;
   $("#result-summary").textContent = result.summary;
-  $("#fit-score").textContent = result.fit;
-  $("#score-ring").style.setProperty("--score", result.fit);
+  $("#need-score").textContent = result.needScore;
+  $("#pass-score").textContent = result.passScore;
+  $("#need-score-ring").style.setProperty("--score", result.needScore);
+  $("#pass-score-ring").style.setProperty("--score", result.passScore);
 
   const flags = [];
+  flags.push(`필요성 ${result.needScore}점`);
+  flags.push(`통과 가능성 ${result.passScore}점`);
   flags.push(data.businessContinuing === "yes" ? "영업 계속 중" : "영업 중단 상태");
   flags.push(result.equity < 0 ? "자본잠식 가능" : "순자산 보유");
   if (data.arrears === "yes") flags.push("연체 발생");
@@ -757,7 +768,8 @@ function renderResult(data, result) {
     .join("");
 
   const explanation = buildResultExplanation(data, result);
-  $("#result-score-explanation").textContent = explanation.scoreExplanation;
+  $("#result-need-explanation").textContent = explanation.needExplanation;
+  $("#result-pass-explanation").textContent = explanation.passExplanation;
   $("#result-financial-explanation").textContent = explanation.financialExplanation;
   $("#result-procedure-explanation").textContent = explanation.procedureExplanation;
 }
