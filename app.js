@@ -12,6 +12,8 @@ const uploadStatus = $("#upload-status");
 const verifySection = $("#verify-section");
 const resultSection = $("#result-section");
 const form = $("#diagnosis-form");
+const OCR_MAX_PAGES = 10;
+const TESSERACT_CDN = "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js";
 
 const aliases = {
   currentAssets: ["유동자산", "유동 자산"],
@@ -72,25 +74,69 @@ function parseNumber(value) {
 }
 
 function findNumbers(text) {
-  const matches = text.match(/[△▲-]?\s*\(?\d{1,3}(?:,\d{3})+(?:\.\d+)?\)?|[△▲-]?\s*\(?\d+(?:\.\d+)?\)?/g) || [];
+  const matches = text.match(/[△▲-]?\s*(?:\(\s*)?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\s*\)?/g) || [];
   return matches
     .map((raw) => ({ raw, value: parseNumber(raw) }))
     .filter(({ raw, value }) => Math.abs(value) > 0 && !(value >= 1900 && value <= 2100 && !raw.includes(",")));
 }
 
+function normalizeLabel(value) {
+  return String(value).replace(/[^가-힣A-Za-z]/g, "").toLowerCase();
+}
+
+function editDistance(left, right) {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    let diagonal = previous[0];
+    previous[0] = leftIndex;
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const above = previous[rightIndex];
+      const substitution = diagonal + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1);
+      previous[rightIndex] = Math.min(previous[rightIndex] + 1, previous[rightIndex - 1] + 1, substitution);
+      diagonal = above;
+    }
+  }
+  return previous[right.length];
+}
+
+function fuzzyIncludes(text, target) {
+  if (text.includes(target)) return true;
+  const maxDistance = target.length >= 8 ? 2 : 1;
+  const minLength = Math.max(2, target.length - maxDistance);
+  const maxLength = target.length + maxDistance;
+  for (let length = minLength; length <= maxLength; length += 1) {
+    for (let start = 0; start + length <= text.length; start += 1) {
+      if (editDistance(text.slice(start, start + length), target) <= maxDistance) return true;
+    }
+  }
+  return false;
+}
+
 function extractMetric(lines, names) {
   for (const name of names) {
-    const normalizedName = name.replace(/\s/g, "");
-    const candidates = lines.filter((line) => line.replace(/\s/g, "").includes(normalizedName));
-    for (const line of candidates) {
+    const looseName = name
+      .replace(/\s/g, "")
+      .split("")
+      .map((character) => character.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("\\s*");
+    const namePattern = new RegExp(looseName);
+    for (const line of lines) {
       if (/%|비율/.test(line)) continue;
-      const compact = line.replace(/\s/g, "");
-      const index = compact.indexOf(normalizedName);
-      const trailing = compact.slice(index + normalizedName.length);
+      const match = line.match(namePattern);
+      let trailing;
+      if (match && match.index !== undefined) {
+        trailing = line.slice(match.index + match[0].length);
+      } else {
+        const numberStart = line.search(/[△▲-]?\s*(?:\(\s*)?\d/);
+        if (numberStart <= 0) continue;
+        const recognizedLabel = normalizeLabel(line.slice(0, numberStart));
+        if (!fuzzyIncludes(recognizedLabel, normalizeLabel(name))) continue;
+        trailing = line.slice(numberStart);
+      }
       const numbers = findNumbers(trailing);
       if (numbers.length) {
         const firstLooksLikeNoteNumber =
-          numbers.length >= 2 &&
+          numbers.length >= 3 &&
           Math.abs(numbers[0].value) < 100 &&
           !numbers[0].raw.includes(",") &&
           (numbers[1].raw.includes(",") || Math.abs(numbers[1].value) >= 100);
@@ -107,7 +153,8 @@ function itemsToLines(items) {
     if (!item.str || !item.str.trim()) continue;
     const x = item.transform?.[4] || 0;
     const y = item.transform?.[5] || 0;
-    let row = rows.find((entry) => Math.abs(entry.y - y) < 2.5);
+    const tolerance = Math.max(3.5, Math.min(6, (item.height || 10) * 0.45));
+    let row = rows.find((entry) => Math.abs(entry.y - y) < tolerance);
     if (!row) {
       row = { y, items: [] };
       rows.push(row);
@@ -128,7 +175,74 @@ async function readPdf(file) {
     const content = await page.getTextContent();
     allLines.push(...itemsToLines(content.items));
   }
-  return { lines: allLines, pages: pdf.numPages, text: allLines.join("\n") };
+  return { lines: allLines, pages: pdf.numPages, text: allLines.join("\n"), pdf };
+}
+
+function loadTesseract() {
+  if (globalThis.Tesseract) return Promise.resolve(globalThis.Tesseract);
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-tesseract-loader="true"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve(globalThis.Tesseract), { once: true });
+      existing.addEventListener("error", () => reject(new Error("OCR 엔진을 불러오지 못했습니다.")), { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = TESSERACT_CDN;
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    script.dataset.tesseractLoader = "true";
+    script.onload = () => resolve(globalThis.Tesseract);
+    script.onerror = () => reject(new Error("OCR 엔진을 불러오지 못했습니다."));
+    document.head.appendChild(script);
+  });
+}
+
+async function readScannedPdf(pdf, onProgress) {
+  const Tesseract = await loadTesseract();
+  if (!Tesseract?.createWorker) throw new Error("OCR 엔진을 초기화하지 못했습니다.");
+
+  const totalPages = Math.min(pdf.numPages, OCR_MAX_PAGES);
+  let currentPage = 1;
+  const worker = await Tesseract.createWorker(["kor", "eng"], 1, {
+    logger(message) {
+      if (message.status === "recognizing text") {
+        onProgress(currentPage, totalPages, Math.round((message.progress || 0) * 100));
+      }
+    },
+  });
+  const ocrLines = [];
+
+  try {
+    for (currentPage = 1; currentPage <= totalPages; currentPage += 1) {
+      onProgress(currentPage, totalPages, 0);
+      const page = await pdf.getPage(currentPage);
+      const viewport = page.getViewport({ scale: 1.8 });
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d", { alpha: false });
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      await page.render({ canvasContext: context, viewport }).promise;
+      const recognition = await worker.recognize(canvas);
+      ocrLines.push(...(recognition.data.text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+      page.cleanup();
+    }
+  } finally {
+    await worker.terminate();
+  }
+
+  return { lines: ocrLines, text: ocrLines.join("\n"), pages: pdf.numPages, ocrPages: totalPages };
+}
+
+function collectMetrics(lines) {
+  const extracted = {};
+  let found = 0;
+  Object.entries(aliases).forEach(([key, names]) => {
+    const value = extractMetric(lines, names);
+    extracted[key] = value ?? "";
+    if (value !== null) found += 1;
+  });
+  return { extracted, found };
 }
 
 function detectUnit(text) {
@@ -176,28 +290,48 @@ async function handleFile(file) {
   $("#status-title").textContent = "재무제표를 읽고 있습니다…";
   $("#status-detail").textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)}MB`;
 
+  let pdfDocument;
   try {
     const result = await readPdf(file);
-    const extracted = {};
-    let found = 0;
-    Object.entries(aliases).forEach(([key, names]) => {
-      const value = extractMetric(result.lines, names);
-      extracted[key] = value ?? "";
-      if (value !== null) found += 1;
-    });
+    pdfDocument = result.pdf;
+    let { extracted, found } = collectMetrics(result.lines);
+    let extractionLabel = "텍스트";
+
+    if (found < 4) {
+      $("#status-title").textContent = "스캔 문서를 문자로 변환하고 있습니다…";
+      $("#status-detail").textContent = `${file.name} · OCR 엔진 준비 중 · 문서는 외부로 전송되지 않습니다.`;
+      try {
+        const ocrResult = await readScannedPdf(result.pdf, (page, total, progress) => {
+          $("#status-detail").textContent = `${file.name} · OCR ${page}/${total}페이지 · ${progress}%`;
+        });
+        const ocrMetrics = collectMetrics(ocrResult.lines);
+        if (ocrMetrics.found > found) {
+          extracted = ocrMetrics.extracted;
+          found = ocrMetrics.found;
+          extractionLabel = `OCR ${ocrResult.ocrPages}페이지`;
+          result.text = ocrResult.text;
+        }
+      } catch (ocrError) {
+        console.warn("OCR fallback failed", ocrError);
+      }
+    }
+
     extracted.amountUnit = detectUnit(result.text);
     extracted.fiscalYear = detectYear(result.text);
     setFormValues(extracted);
     $("#status-title").textContent = found >= 4 ? "주요 재무수치를 찾았습니다" : "PDF 확인이 완료되었습니다";
     $("#status-detail").textContent = found >= 4
-      ? `${file.name} · ${result.pages}페이지 · ${found}개 항목 자동 추출`
-      : `${file.name} · 문자인식이 제한적입니다. 아래에서 수치를 직접 입력해주세요.`;
+      ? `${file.name} · ${extractionLabel} 분석 · ${found}개 항목 자동 추출`
+      : `${file.name} · 자동 인식이 제한적입니다. 아래에서 수치를 직접 입력해주세요.`;
     showVerification();
   } catch (error) {
     console.error(error);
     $("#status-title").textContent = "자동 추출이 어려운 PDF입니다";
     $("#status-detail").textContent = `${file.name} · 아래에서 수치를 직접 입력해주세요.`;
     showVerification();
+  } finally {
+    if (typeof pdfDocument?.destroy === "function") await pdfDocument.destroy();
+    else if (typeof pdfDocument?.cleanup === "function") await pdfDocument.cleanup();
   }
 }
 
