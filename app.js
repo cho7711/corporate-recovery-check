@@ -23,8 +23,8 @@ const aliases = {
   totalAssets: ["자산총계", "자산 총계", "자산합계"],
   totalLiabilities: ["부채총계", "부채 총계", "부채합계"],
   revenue: ["매출액", "영업수익", "수익(매출액)", "매출"],
-  operatingProfit: ["영업이익(손실)", "영업이익", "영업손실"],
-  netIncome: ["당기순이익(손실)", "당기순이익", "당기순손실", "분기순이익"],
+  operatingProfit: ["영업이익(손실)", "영업이익", "영업손실", "영업손익"],
+  netIncome: ["당기순이익(손실)", "당기순이익", "당기순손실", "당기순손익", "분기순이익"],
   cash: ["현금및현금성자산", "현금 및 현금성자산", "현금성자산"],
   interestExpense: ["이자비용", "금융비용"],
   operatingCashFlow: ["영업활동으로인한현금흐름", "영업활동 현금흐름", "영업활동현금흐름"],
@@ -186,6 +186,10 @@ function extractMetric(lines, names) {
     const namePattern = new RegExp(looseName);
     for (const line of lines) {
       if (/%|비율/.test(line)) continue;
+      const normalizedLine = normalizeLabel(line);
+      const normalizedName = normalizeLabel(name);
+      if (normalizedName === "유동자산" && normalizedLine.includes("비유동자산")) continue;
+      if (normalizedName === "유동부채" && normalizedLine.includes("비유동부채")) continue;
       const match = line.match(namePattern);
       let trailing;
       if (match && match.index !== undefined) {
@@ -194,7 +198,7 @@ function extractMetric(lines, names) {
         const numberStart = line.search(/[△▲-]?\s*(?:\(\s*)?\d/);
         if (numberStart <= 0) continue;
         const recognizedLabel = normalizeLabel(line.slice(0, numberStart));
-        if (!fuzzyIncludes(recognizedLabel, normalizeLabel(name))) continue;
+        if (!fuzzyIncludes(recognizedLabel, normalizedName)) continue;
         trailing = line.slice(numberStart);
       }
       const numbers = findNumbers(trailing);
@@ -320,8 +324,8 @@ async function readScannedPdf(pdf, onProgress) {
     const lowerLine = gridLines[firstDataBoundary + rowIndex + 1];
     if (!Number.isFinite(upperLine) || !Number.isFinite(lowerLine)) return null;
 
-    const xStartRatio = side === "left" ? 0.345 : 0.77;
-    const xEndRatio = side === "left" ? 0.49 : 0.918;
+    const xStartRatio = side === "left" ? 0.352 : 0.795;
+    const xEndRatio = side === "left" ? 0.492 : 0.94;
     const sourceX = Math.floor(canvas.width * xStartRatio);
     const sourceY = upperLine + 4;
     const sourceWidth = Math.floor(canvas.width * (xEndRatio - xStartRatio));
@@ -402,6 +406,7 @@ async function readScannedPdf(pdf, onProgress) {
       context.putImageData(pixels, 0, 0);
 
       const gridLines = findGridLines(canvas, pixels);
+      const pageOcrLines = [];
       const tableRegions = gridLines.length >= 36
         ? [
             { left: 0.055, top: 0.17, width: 0.47, height: 0.69 },
@@ -433,47 +438,54 @@ async function readScannedPdf(pdf, onProgress) {
           sourceHeight,
         );
         const recognition = await worker.recognize(regionCanvas);
-        ocrLines.push(...(recognition.data.text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+        const recognizedLines = (recognition.data.text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        pageOcrLines.push(...recognizedLines);
+        ocrLines.push(...recognizedLines);
       }
 
       if (gridLines.length >= 36) {
         const firstDataBoundary = gridLines[0] / canvas.height < 0.218 ? 2 : 1;
-        const possibleBalance = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 20, "right");
-        const totalsAgree = possibleBalance > 0;
+        const pageLabelText = normalizeLabel(pageOcrLines.join(" "));
+        let isBalanceSheet = ["표준대차대조표", "유동자산", "자산총계", "부채총계"]
+          .some((label) => fuzzyIncludes(pageLabelText, normalizeLabel(label)));
+        let isIncomeStatement = ["표준손익계산서", "매출액", "영업손익", "당기순손익"]
+          .some((label) => fuzzyIncludes(pageLabelText, normalizeLabel(label)));
 
-        if (totalsAgree) {
+        if (!isBalanceSheet && !isIncomeStatement) {
+          const possibleAssetTotal = await recognizeAmountCell(
+            amountSourceCanvas,
+            gridLines,
+            firstDataBoundary,
+            18,
+            "left",
+          );
+          const possibleBalanceTotal = await recognizeAmountCell(
+            amountSourceCanvas,
+            gridLines,
+            firstDataBoundary,
+            8,
+            "right",
+          );
+          const totalScale = Math.max(Math.abs(possibleAssetTotal || 0), Math.abs(possibleBalanceTotal || 0));
+          isBalanceSheet = totalScale > 0 && Math.abs(possibleAssetTotal - possibleBalanceTotal) / totalScale < 0.03;
+          isIncomeStatement = !isBalanceSheet;
+        }
+
+        if (isBalanceSheet && !isIncomeStatement) {
           standardMetrics.currentAssets = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 0, "left");
           standardMetrics.cash = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 2, "left");
-          standardMetrics.totalAssets = possibleBalance;
-          const directCurrentLiabilities = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 31, "left");
-          const noncurrentLiabilities = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 7, "right");
-          standardMetrics.totalLiabilities = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 9, "right");
-          const calculatedCurrentLiabilities = standardMetrics.totalLiabilities - noncurrentLiabilities;
-          standardMetrics.currentLiabilities = calculatedCurrentLiabilities > 0
-            ? calculatedCurrentLiabilities
-            : directCurrentLiabilities;
-        } else {
+          standardMetrics.totalAssets = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 18, "left");
+          standardMetrics.currentLiabilities = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 19, "left");
+          const noncurrentLiabilities = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 33, "left");
+          const directTotalLiabilities = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 34, "left");
+          standardMetrics.totalLiabilities = standardMetrics.currentLiabilities !== null && noncurrentLiabilities !== null
+            ? standardMetrics.currentLiabilities + noncurrentLiabilities
+            : directTotalLiabilities;
+        } else if (isIncomeStatement) {
           standardMetrics.revenue = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 0, "left");
-          standardMetrics.operatingProfit = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 32, "left");
-          const directInterestExpense = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 7, "right");
-          const nonoperatingIncome = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 33, "left");
-          const incomeBeforeTax = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 15, "right");
-          const otherNonoperatingExpenses = [];
-          for (const rowIndex of [8, 10, 11, 13, 14]) {
-            otherNonoperatingExpenses.push(
-              await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, rowIndex, "right"),
-            );
-          }
-          const calculatedNonoperatingExpenses =
-            standardMetrics.operatingProfit + nonoperatingIncome - incomeBeforeTax;
-          const calculatedInterestExpense = calculatedNonoperatingExpenses - otherNonoperatingExpenses.reduce(
-            (sum, value) => sum + (value || 0),
-            0,
-          );
-          standardMetrics.interestExpense = calculatedInterestExpense > 0
-            ? calculatedInterestExpense
-            : directInterestExpense;
-          standardMetrics.netIncome = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 17, "right");
+          standardMetrics.operatingProfit = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 28, "left");
+          standardMetrics.interestExpense = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 33, "left");
+          standardMetrics.netIncome = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 2, "right");
         }
       }
       page.cleanup();
