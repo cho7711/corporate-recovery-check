@@ -100,8 +100,6 @@ function formatAmount(value) {
 
 function formatKoreanGroup(group) {
   if (group >= 1000 && group % 1000 === 0) return `${group / 1000}천`;
-  if (group >= 100 && group % 100 === 0) return `${group / 100}백`;
-  if (group >= 10 && group % 10 === 0) return `${group / 10}십`;
   return group.toLocaleString("ko-KR");
 }
 
