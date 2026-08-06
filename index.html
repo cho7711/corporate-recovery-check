@@ -9,7 +9,7 @@
     />
     <meta name="color-scheme" content="light" />
     <title>법인회생 가능성 예비진단</title>
-    <link rel="stylesheet" href="./styles.css?v=20260806-6" />
+    <link rel="stylesheet" href="./styles.css?v=20260806-7" />
   </head>
   <body>
     <div class="site-shell">
@@ -17,7 +17,7 @@
         <a class="brand" href="#top" aria-label="법인회생 가능성 예비진단 처음으로">
           <span class="brand-mark" aria-hidden="true">R</span>
           <span>
-            <strong>회생가능성 진단</strong>
+            <strong>법인회생 가능성 진단</strong>
             <small>Corporate Recovery Check</small>
           </span>
         </a>
@@ -26,11 +26,11 @@
 
       <main id="top">
         <section class="hero" aria-labelledby="page-title">
-          <div class="eyebrow"><span>2</span> 재무자료 기반 간편진단</div>
-          <h1 id="page-title">회생의 가능성,<br /><em>숫자에서 먼저 확인하세요.</em></h1>
+          <div class="eyebrow"><span>2</span> 법원 회생절차 가능성 예비진단</div>
+          <h1 id="page-title">법인회생의 가능성,<br /><em>숫자에서 먼저 확인하세요.</em></h1>
           <p>
-            재무제표 PDF에서 주요 지표를 찾아 지급불능 위험과 계속기업 가능성을 함께 살펴봅니다.
-            약 3분이면 검토 방향을 확인할 수 있습니다.
+            해당 회사가 법원의 법인회생절차를 통해 채무를 조정하고 사업을 계속할 가능성을,
+            재무제표와 현재 상황을 바탕으로 미리 살펴보는 예비진단입니다.
           </p>
           <ol class="steps" aria-label="진단 단계">
             <li class="active" data-step="1"><b>1</b><span>PDF 업로드</span></li>
@@ -73,8 +73,8 @@
           </div>
 
           <div class="sample-row">
-            <span>PDF가 아직 없으신가요?</span>
-            <button class="link-button" id="sample-button" type="button">샘플 수치로 먼저 체험하기 →</button>
+            <span>PDF 없이 먼저 확인해보세요.</span>
+            <button class="link-button" id="sample-button" type="button">직접 입력으로 확인하기(샘플 예시)</button>
           </div>
         </section>
 
@@ -171,7 +171,7 @@
           <div class="result-hero">
             <div class="result-copy">
               <span class="result-kicker" id="result-kicker">예비진단 완료</span>
-              <h2 id="result-title">회생절차 검토 가치가 <em>높습니다</em></h2>
+              <h2 id="result-title">법인회생절차를 <em>구체적으로 검토할 단계입니다</em></h2>
               <p id="result-summary"></p>
               <div class="result-flags" id="result-flags"></div>
             </div>
@@ -207,11 +207,36 @@
             </article>
           </div>
 
+          <article class="interpretation-card" aria-labelledby="interpretation-title">
+            <div class="interpretation-heading">
+              <span class="section-number">RESULT GUIDE</span>
+              <h3 id="interpretation-title">이 결과를 이렇게 해석하세요</h3>
+              <p>점수만 보지 말고 현재 위기, 영업 지속성, 법원 절차 검토 요소를 함께 확인해야 합니다.</p>
+            </div>
+            <div class="interpretation-grid">
+              <section>
+                <b>01</b>
+                <strong>종합지수의 의미</strong>
+                <p id="result-score-explanation"></p>
+              </section>
+              <section>
+                <b>02</b>
+                <strong>재무수치의 의미</strong>
+                <p id="result-financial-explanation"></p>
+              </section>
+              <section>
+                <b>03</b>
+                <strong>법원 절차 관점</strong>
+                <p id="result-procedure-explanation"></p>
+              </section>
+            </div>
+          </article>
+
           <article class="next-step-card">
             <div>
               <span class="section-number">NEXT</span>
               <h3>지금 준비하면 좋은 자료</h3>
-              <p>전문가 상담 전 아래 자료를 정리하면 회생 가능성과 자금계획을 더 빠르게 검토할 수 있습니다.</p>
+              <p>전문가 상담 전 아래 자료를 정리하면 법인회생절차의 검토 가능성과 자금계획을 더 구체적으로 살펴볼 수 있습니다.</p>
             </div>
             <ol>
               <li><b>01</b><span><strong>최근 3개년 재무자료</strong>재무제표·부가세 신고자료</span></li>
@@ -228,20 +253,21 @@
           <div class="disclaimer">
             <b>꼭 확인해주세요</b>
             <p>
-              본 결과는 입력된 재무정보를 정량 기준으로 해석한 예비진단이며, 법원의 회생절차 개시·인가 가능성을
-              보장하거나 법률·회계 자문을 대신하지 않습니다. 실제 신청 전에는 변호사·회계사 등 전문가가 채무구조,
-              담보권, 현금흐름, 청산가치와 계속기업가치를 종합 검토해야 합니다.
+              본 결과는 입력된 재무정보와 회사 현황을 바탕으로 해당 법인이 법원의 법인회생절차를 검토할 필요성과
+              기초적인 가능성을 미리 살펴보는 예비진단입니다. 종합 검토지수는 법원의 개시·인가 확률이 아니며,
+              법원의 판단을 보장하거나 법률·회계 자문을 대신하지 않습니다. 실제 신청 전에는 변호사·회계사 등
+              전문가가 채무구조, 담보권, 현금흐름, 청산가치, 계속기업가치와 회생계획 수행 가능성을 종합 검토해야 합니다.
             </p>
           </div>
         </section>
       </main>
 
       <footer>
-        <p>회생가능성 진단 <span>·</span> 재무자료 기반 예비검토</p>
+        <p>법인회생 가능성 진단 <span>·</span> 법원 절차 예비검토</p>
         <p>업로드한 파일과 입력값은 서버에 저장되지 않습니다.</p>
       </footer>
     </div>
 
-    <script type="module" src="./app.js?v=20260806-6"></script>
+    <script type="module" src="./app.js?v=20260806-7"></script>
   </body>
 </html>
