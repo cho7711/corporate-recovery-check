@@ -13,6 +13,8 @@ const verifySection = $("#verify-section");
 const resultSection = $("#result-section");
 const form = $("#diagnosis-form");
 const OCR_MAX_PAGES = 10;
+const OCR_RENDER_SCALE = 2.8;
+const OCR_DARK_PIXEL_THRESHOLD = 185;
 const TESSERACT_CDN = "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js";
 
 const aliases = {
@@ -211,27 +213,215 @@ async function readScannedPdf(pdf, onProgress) {
       }
     },
   });
+  await worker.setParameters({
+    tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+    preserve_interword_spaces: "1",
+    user_defined_dpi: "300",
+  });
+  const numericWorker = await Tesseract.createWorker(["eng"], 1);
+  await numericWorker.setParameters({
+    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
+    tessedit_char_whitelist: "0123456789,.-()",
+    preserve_interword_spaces: "1",
+    user_defined_dpi: "300",
+  });
   const ocrLines = [];
+  const standardMetrics = {};
+
+  function findGridLines(canvas, pixels) {
+    const left = Math.floor(canvas.width * 0.05);
+    const right = Math.floor(canvas.width * 0.95);
+    const top = Math.floor(canvas.height * 0.19);
+    const bottom = Math.floor(canvas.height * 0.82);
+    const minimumDarkPixels = (right - left) * 0.62;
+    const candidates = [];
+
+    for (let y = top; y < bottom; y += 1) {
+      let darkPixels = 0;
+      for (let x = left; x < right; x += 1) {
+        if (pixels.data[(y * canvas.width + x) * 4] === 0) darkPixels += 1;
+      }
+      if (darkPixels >= minimumDarkPixels) candidates.push(y);
+    }
+
+    const groups = [];
+    for (const y of candidates) {
+      const group = groups.at(-1);
+      if (group && y <= group.at(-1) + 1) group.push(y);
+      else groups.push([y]);
+    }
+    return groups.map((group) => Math.round(group.reduce((sum, y) => sum + y, 0) / group.length));
+  }
+
+  async function recognizeAmountCell(canvas, gridLines, firstDataBoundary, rowIndex, side) {
+    const upperLine = gridLines[firstDataBoundary + rowIndex];
+    const lowerLine = gridLines[firstDataBoundary + rowIndex + 1];
+    if (!Number.isFinite(upperLine) || !Number.isFinite(lowerLine)) return null;
+
+    const xStartRatio = side === "left" ? 0.345 : 0.77;
+    const xEndRatio = side === "left" ? 0.49 : 0.918;
+    const sourceX = Math.floor(canvas.width * xStartRatio);
+    const sourceY = upperLine + 4;
+    const sourceWidth = Math.floor(canvas.width * (xEndRatio - xStartRatio));
+    const sourceHeight = Math.max(8, lowerLine - upperLine - 8);
+    const amountCanvas = document.createElement("canvas");
+    const amountContext = amountCanvas.getContext("2d", { alpha: false });
+    amountCanvas.width = sourceWidth * 3;
+    amountCanvas.height = sourceHeight * 3;
+    amountContext.imageSmoothingEnabled = true;
+    amountContext.imageSmoothingQuality = "high";
+    amountContext.drawImage(
+      canvas,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      amountCanvas.width,
+      amountCanvas.height,
+    );
+    const variants = [
+      { name: "single-line", mode: Tesseract.PSM.SINGLE_LINE },
+      { name: "raw-line", mode: Tesseract.PSM.RAW_LINE },
+    ];
+
+    const candidates = [];
+    for (const variant of variants) {
+      await numericWorker.setParameters({ tessedit_pageseg_mode: variant.mode });
+      const recognition = await numericWorker.recognize(amountCanvas);
+      const raw = recognition.data.text || "";
+      const digits = raw.replace(/\D/g, "");
+      if (digits) candidates.push({
+        name: variant.name,
+        raw: raw.trim(),
+        digits,
+        confidence: recognition.data.confidence || 0,
+      });
+    }
+
+    const primaryCandidate = candidates.find((candidate) => candidate.name === "single-line");
+    const rawLineCandidate = candidates.find((candidate) => candidate.name === "raw-line");
+    const selectedCandidate = primaryCandidate?.confidence >= 40
+      ? primaryCandidate
+      : (rawLineCandidate || primaryCandidate);
+    const selectedDigits = selectedCandidate?.digits || "";
+    const value = selectedDigits ? Number(selectedDigits) * (/[-△▲]/.test(primaryCandidate?.raw || "") ? -1 : 1) : null;
+    return Number.isFinite(value) ? value : null;
+  }
 
   try {
     for (currentPage = 1; currentPage <= totalPages; currentPage += 1) {
       onProgress(currentPage, totalPages, 0);
       const page = await pdf.getPage(currentPage);
-      const viewport = page.getViewport({ scale: 1.8 });
+      const viewport = page.getViewport({ scale: OCR_RENDER_SCALE });
       const canvas = document.createElement("canvas");
       const context = canvas.getContext("2d", { alpha: false });
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
       await page.render({ canvasContext: context, viewport }).promise;
-      const recognition = await worker.recognize(canvas);
-      ocrLines.push(...(recognition.data.text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+      const amountSourceCanvas = document.createElement("canvas");
+      const amountSourceContext = amountSourceCanvas.getContext("2d", { alpha: false });
+      amountSourceCanvas.width = canvas.width;
+      amountSourceCanvas.height = canvas.height;
+      amountSourceContext.drawImage(canvas, 0, 0);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+      for (let offset = 0; offset < pixels.data.length; offset += 4) {
+        const luminance =
+          pixels.data[offset] * 0.299 +
+          pixels.data[offset + 1] * 0.587 +
+          pixels.data[offset + 2] * 0.114;
+        const value = luminance < OCR_DARK_PIXEL_THRESHOLD ? 0 : 255;
+        pixels.data[offset] = value;
+        pixels.data[offset + 1] = value;
+        pixels.data[offset + 2] = value;
+        pixels.data[offset + 3] = 255;
+      }
+      context.putImageData(pixels, 0, 0);
+
+      const gridLines = findGridLines(canvas, pixels);
+      const tableRegions = gridLines.length >= 36
+        ? [
+            { left: 0.055, top: 0.17, width: 0.47, height: 0.69 },
+            { left: 0.495, top: 0.17, width: 0.45, height: 0.69 },
+          ]
+        : [{ left: 0, top: 0, width: 1, height: 1 }];
+      const recognitionSourceCanvas = gridLines.length >= 36 ? canvas : amountSourceCanvas;
+      await worker.setParameters({
+        tessedit_pageseg_mode: gridLines.length >= 36 ? Tesseract.PSM.AUTO : Tesseract.PSM.SINGLE_BLOCK,
+      });
+      for (const region of tableRegions) {
+        const sourceX = Math.floor(canvas.width * region.left);
+        const sourceY = Math.floor(canvas.height * region.top);
+        const sourceWidth = Math.floor(canvas.width * region.width);
+        const sourceHeight = Math.floor(canvas.height * region.height);
+        const regionCanvas = document.createElement("canvas");
+        const regionContext = regionCanvas.getContext("2d", { alpha: false });
+        regionCanvas.width = sourceWidth;
+        regionCanvas.height = sourceHeight;
+        regionContext.drawImage(
+          recognitionSourceCanvas,
+          sourceX,
+          sourceY,
+          sourceWidth,
+          sourceHeight,
+          0,
+          0,
+          sourceWidth,
+          sourceHeight,
+        );
+        const recognition = await worker.recognize(regionCanvas);
+        ocrLines.push(...(recognition.data.text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+      }
+
+      if (gridLines.length >= 36) {
+        const firstDataBoundary = gridLines[0] / canvas.height < 0.218 ? 2 : 1;
+        const possibleBalance = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 20, "right");
+        const totalsAgree = possibleBalance > 0;
+
+        if (totalsAgree) {
+          standardMetrics.currentAssets = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 0, "left");
+          standardMetrics.cash = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 2, "left");
+          standardMetrics.totalAssets = possibleBalance;
+          const directCurrentLiabilities = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 31, "left");
+          const noncurrentLiabilities = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 7, "right");
+          standardMetrics.totalLiabilities = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 9, "right");
+          const calculatedCurrentLiabilities = standardMetrics.totalLiabilities - noncurrentLiabilities;
+          standardMetrics.currentLiabilities = calculatedCurrentLiabilities > 0
+            ? calculatedCurrentLiabilities
+            : directCurrentLiabilities;
+        } else {
+          standardMetrics.revenue = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 0, "left");
+          standardMetrics.operatingProfit = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 32, "left");
+          const directInterestExpense = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 7, "right");
+          const nonoperatingIncome = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 33, "left");
+          const incomeBeforeTax = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 15, "right");
+          const otherNonoperatingExpenses = [];
+          for (const rowIndex of [8, 10, 11, 13, 14]) {
+            otherNonoperatingExpenses.push(
+              await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, rowIndex, "right"),
+            );
+          }
+          const calculatedNonoperatingExpenses =
+            standardMetrics.operatingProfit + nonoperatingIncome - incomeBeforeTax;
+          const calculatedInterestExpense = calculatedNonoperatingExpenses - otherNonoperatingExpenses.reduce(
+            (sum, value) => sum + (value || 0),
+            0,
+          );
+          standardMetrics.interestExpense = calculatedInterestExpense > 0
+            ? calculatedInterestExpense
+            : directInterestExpense;
+          standardMetrics.netIncome = await recognizeAmountCell(amountSourceCanvas, gridLines, firstDataBoundary, 17, "right");
+        }
+      }
       page.cleanup();
     }
   } finally {
     await worker.terminate();
+    await numericWorker.terminate();
   }
 
-  return { lines: ocrLines, text: ocrLines.join("\n"), pages: pdf.numPages, ocrPages: totalPages };
+  return { lines: ocrLines, text: ocrLines.join("\n"), standardMetrics, pages: pdf.numPages, ocrPages: totalPages };
 }
 
 function collectMetrics(lines) {
@@ -305,6 +495,12 @@ async function handleFile(file) {
           $("#status-detail").textContent = `${file.name} · OCR ${page}/${total}페이지 · ${progress}%`;
         });
         const ocrMetrics = collectMetrics(ocrResult.lines);
+        Object.entries(ocrResult.standardMetrics || {}).forEach(([key, value]) => {
+          if (value !== null && value !== undefined) ocrMetrics.extracted[key] = value;
+        });
+        ocrMetrics.found = Object.values(ocrMetrics.extracted).filter(
+          (value) => value !== "" && value !== null && value !== undefined,
+        ).length;
         if (ocrMetrics.found > found) {
           extracted = ocrMetrics.extracted;
           found = ocrMetrics.found;
@@ -525,3 +721,4 @@ $("#restart-button").addEventListener("click", () => {
 });
 
 $("#print-button").addEventListener("click", () => window.print());
+
