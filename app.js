@@ -75,6 +75,29 @@ function parseNumber(value) {
   return Number.isFinite(number) ? (negative ? -Math.abs(number) : number) : 0;
 }
 
+function formatAmount(value) {
+  if (value === null || value === undefined || value === "") return "";
+
+  const original = String(value);
+  let raw = original.trim().replace(/,/g, "").replace(/\s/g, "");
+  let sign = "";
+
+  if (/^\(.*\)$/.test(raw) || /^[△▲]/.test(raw)) {
+    sign = "-";
+    raw = raw.replace(/[()△▲]/g, "");
+  } else if (raw.startsWith("-")) {
+    sign = "-";
+    raw = raw.slice(1);
+  }
+
+  if (!/^\d*(?:\.\d*)?$/.test(raw) || raw === "") return original;
+
+  const [integerPart = "0", decimalPart] = raw.split(".");
+  const integer = (integerPart || "0").replace(/^0+(?=\d)/, "");
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${sign}${grouped}${decimalPart !== undefined ? `.${decimalPart}` : ""}`;
+}
+
 function findNumbers(text) {
   const matches = text.match(/[△▲-]?\s*(?:\(\s*)?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\s*\)?/g) || [];
   return matches
@@ -452,7 +475,9 @@ function detectYear(text) {
 function setFormValues(values) {
   Object.entries(values).forEach(([name, value]) => {
     const input = form.elements.namedItem(name);
-    if (input && "value" in input && value !== null && value !== undefined) input.value = String(value);
+    if (input && "value" in input && value !== null && value !== undefined) {
+      input.value = name in aliases ? formatAmount(value) : String(value);
+    }
   });
 }
 
@@ -557,6 +582,15 @@ $("#sample-button").addEventListener("click", () => {
   $("#status-title").textContent = "샘플 재무정보를 불러왔습니다";
   $("#status-detail").textContent = "가상의 제조기업 수치입니다. 자유롭게 수정해보세요.";
   showVerification();
+});
+
+Object.keys(aliases).forEach((name) => {
+  const input = form.elements.namedItem(name);
+  if (input && "value" in input) {
+    input.addEventListener("blur", () => {
+      input.value = formatAmount(input.value);
+    });
+  }
 });
 
 function getFormData() {
@@ -721,4 +755,3 @@ $("#restart-button").addEventListener("click", () => {
 });
 
 $("#print-button").addEventListener("click", () => window.print());
-
