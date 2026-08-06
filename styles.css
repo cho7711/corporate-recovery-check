@@ -222,6 +222,56 @@ footer p { margin: 0; } footer span { margin: 0 5px; }
   footer p + p { margin-top: 4px; }
 }
 
+/* Keep headings as designed while making all supporting content easier to read. */
+body { font-size: 16px; }
+.brand small { font-size: 11px; }
+.secure-note { font-size: 14px; }
+.secure-note span { font-size: 11px; }
+.eyebrow { font-size: 15px; }
+.eyebrow span { font-size: 13px; }
+.hero > p { font-size: 18px; }
+.steps li { font-size: 14px; }
+.steps b { font-size: 13px; }
+.section-number { font-size: 12px; }
+.section-heading p { font-size: 16px; }
+.time-chip, .review-chip { font-size: 13px; }
+.dropzone strong { font-size: 17px; }
+.dropzone > span:nth-of-type(2) { font-size: 14px; }
+.file-button { font-size: 14px; }
+.upload-status strong { font-size: 16px; }
+.upload-status span { font-size: 14px; }
+.text-button, .link-button { font-size: 14px; }
+.privacy-row b { font-size: 15px; }
+.privacy-row span { font-size: 14px; }
+.sample-row { font-size: 14px; }
+form label > span, .meta-grid label > span { font-size: 15px; }
+input[type="text"], input[type="number"], input[inputmode="decimal"], select { font-size: 16px; }
+.form-section-title span { font-size: 13px; }
+.amount-input input { padding-right: 84px; font-variant-numeric: tabular-nums; }
+.amount-input i { top: 13px; font-size: 12px; }
+legend { font-size: 14px; }
+.choice-pills span { font-size: 14px; }
+.form-actions p { font-size: 13px; }
+.primary-button, .secondary-button { font-size: 15px; }
+.result-kicker { font-size: 13px; }
+.result-copy > p { font-size: 16px; }
+.result-flags span { font-size: 13px; }
+.score-ring i { font-size: 12px; }
+.score-ring small { font-size: 11px; }
+.card-title > span { font-size: 11px; }
+.axis-list p { font-size: 14px; }
+.axis-list p b { font-size: 14px; }
+.ratio-card dt { font-size: 13px; }
+.ratio-card dd { font-size: 16px; }
+.findings-card li { font-size: 14px; }
+.next-step-card p { font-size: 14px; }
+.next-step-card li > b { font-size: 10px; }
+.next-step-card li strong { font-size: 14px; }
+.next-step-card li span { font-size: 13px; }
+.disclaimer b { font-size: 13px; }
+.disclaimer p { font-size: 13px; }
+footer { font-size: 13px; }
+
 @media print {
   body { background: white; }
   .topbar, .hero, #upload-section, #verify-section, .result-actions, footer { display: none !important; }
