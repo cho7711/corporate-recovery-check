@@ -98,6 +98,47 @@ function formatAmount(value) {
   return `${sign}${grouped}${decimalPart !== undefined ? `.${decimalPart}` : ""}`;
 }
 
+function formatKoreanGroup(group) {
+  if (group >= 1000 && group % 1000 === 0) return `${group / 1000}천`;
+  if (group >= 100 && group % 100 === 0) return `${group / 100}백`;
+  if (group >= 10 && group % 10 === 0) return `${group / 10}십`;
+  return group.toLocaleString("ko-KR");
+}
+
+function formatKoreanWon(value, multiplier = 1) {
+  if (value === null || value === undefined || String(value).trim() === "") return "";
+
+  const numeric = parseNumber(value) * parseNumber(multiplier);
+  if (!Number.isFinite(numeric)) return "";
+
+  let remaining = Math.round(Math.abs(numeric));
+  if (remaining === 0) return "0원";
+
+  const largeUnits = ["", "만", "억", "조", "경"];
+  const parts = [];
+  let unitIndex = 0;
+  while (remaining > 0 && unitIndex < largeUnits.length) {
+    const group = remaining % 10000;
+    if (group > 0) parts.unshift(`${formatKoreanGroup(group)}${largeUnits[unitIndex]}`);
+    remaining = Math.floor(remaining / 10000);
+    unitIndex += 1;
+  }
+
+  const sign = numeric < 0 ? "마이너스 " : "";
+  return `${sign}${parts.join(" ")} 원`;
+}
+
+function updateKoreanAmount(name) {
+  const input = form.elements.namedItem(name);
+  const output = document.querySelector(`[data-amount-korean="${name}"]`);
+  if (!input || !("value" in input) || !output) return;
+  output.textContent = formatKoreanWon(input.value, $("#amount-unit").value);
+}
+
+function updateAllKoreanAmounts() {
+  Object.keys(aliases).forEach(updateKoreanAmount);
+}
+
 function findNumbers(text) {
   const matches = text.match(/[△▲-]?\s*(?:\(\s*)?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\s*\)?/g) || [];
   return matches
@@ -479,6 +520,7 @@ function setFormValues(values) {
       input.value = name in aliases ? formatAmount(value) : String(value);
     }
   });
+  updateAllKoreanAmounts();
 }
 
 function showVerification({ scroll = true } = {}) {
@@ -587,11 +629,15 @@ $("#sample-button").addEventListener("click", () => {
 Object.keys(aliases).forEach((name) => {
   const input = form.elements.namedItem(name);
   if (input && "value" in input) {
+    input.addEventListener("input", () => updateKoreanAmount(name));
     input.addEventListener("blur", () => {
       input.value = formatAmount(input.value);
+      updateKoreanAmount(name);
     });
   }
 });
+
+$("#amount-unit").addEventListener("change", updateAllKoreanAmounts);
 
 function getFormData() {
   const data = Object.fromEntries(new FormData(form));
@@ -791,6 +837,7 @@ form.addEventListener("submit", (event) => {
 
 $("#restart-button").addEventListener("click", () => {
   form.reset();
+  updateAllKoreanAmounts();
   resultSection.hidden = true;
   verifySection.hidden = true;
   uploadStatus.hidden = true;
