@@ -5,32 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="재무제표 PDF를 브라우저에서 분석하고 법인회생 검토 필요성을 확인하는 예비진단 도구"
+      content="재무제표 PDF와 기업 현황을 분석해 법인회생 필요성과 신청 통과 가능성을 점수로 확인하는 예비진단 도구"
     />
     <meta name="color-scheme" content="light" />
     <title>법인회생 가능성 예비진단</title>
-    <link rel="stylesheet" href="./styles.css?v=20260806-7" />
+    <link rel="stylesheet" href="./styles.css?v=20260806-8" />
   </head>
   <body>
     <div class="site-shell">
       <header class="topbar">
-        <a class="brand" href="#top" aria-label="법인회생 가능성 예비진단 처음으로">
-          <span class="brand-mark" aria-hidden="true">R</span>
-          <span>
-            <strong>법인회생 가능성 진단</strong>
-            <small>Corporate Recovery Check</small>
-          </span>
-        </a>
         <div class="secure-note"><span aria-hidden="true">●</span> 문서는 브라우저에서만 처리됩니다</div>
       </header>
 
       <main id="top">
         <section class="hero" aria-labelledby="page-title">
-          <div class="eyebrow"><span>2</span> 법원 회생절차 가능성 예비진단</div>
-          <h1 id="page-title">법인회생의 가능성,<br /><em>숫자에서 먼저 확인하세요.</em></h1>
+          <h1 id="page-title">법인회생 필요 여부와<br /><em>법인회생 통과 가능성 알아보기</em></h1>
           <p>
-            해당 회사가 법원의 법인회생절차를 통해 채무를 조정하고 사업을 계속할 가능성을,
-            재무제표와 현재 상황을 바탕으로 미리 살펴보는 예비진단입니다.
+            기업의 재무정보와 현재 상황을 분석해 법인회생이 필요한 정도와
+            법인회생 신청 통과 가능성을 각각 100점 기준으로 확인합니다.
           </p>
           <ol class="steps" aria-label="진단 단계">
             <li class="active" data-step="1"><b>1</b><span>PDF 업로드</span></li>
@@ -171,13 +163,19 @@
           <div class="result-hero">
             <div class="result-copy">
               <span class="result-kicker" id="result-kicker">예비진단 완료</span>
-              <h2 id="result-title">법인회생절차를 <em>구체적으로 검토할 단계입니다</em></h2>
+              <h2 id="result-title">법인회생 필요성이 높고 <em>신청 통과 가능성도 있습니다</em></h2>
               <p id="result-summary"></p>
               <div class="result-flags" id="result-flags"></div>
             </div>
-            <div class="score-ring" id="score-ring" aria-label="종합 검토지수">
-              <span><b id="fit-score">0</b><i>/ 100</i></span>
-              <small>종합 검토지수</small>
+            <div class="score-panel" aria-label="법인회생 점수 결과">
+              <div class="score-ring need-score-ring" id="need-score-ring" aria-label="법인회생 필요성 점수">
+                <span><b id="need-score">0</b><i>/ 100</i></span>
+                <small>법인회생 필요성</small>
+              </div>
+              <div class="score-ring pass-score-ring" id="pass-score-ring" aria-label="법인회생 신청 통과 가능성 점수">
+                <span><b id="pass-score">0</b><i>/ 100</i></span>
+                <small>신청 통과 가능성</small>
+              </div>
             </div>
           </div>
 
@@ -216,17 +214,22 @@
             <div class="interpretation-grid">
               <section>
                 <b>01</b>
-                <strong>종합지수의 의미</strong>
-                <p id="result-score-explanation"></p>
+                <strong>법인회생 필요성</strong>
+                <p id="result-need-explanation"></p>
               </section>
               <section>
                 <b>02</b>
-                <strong>재무수치의 의미</strong>
-                <p id="result-financial-explanation"></p>
+                <strong>신청 통과 가능성</strong>
+                <p id="result-pass-explanation"></p>
               </section>
               <section>
                 <b>03</b>
-                <strong>법원 절차 관점</strong>
+                <strong>재무수치의 근거</strong>
+                <p id="result-financial-explanation"></p>
+              </section>
+              <section>
+                <b>04</b>
+                <strong>법원 판단 전 확인사항</strong>
                 <p id="result-procedure-explanation"></p>
               </section>
             </div>
@@ -254,7 +257,7 @@
             <b>꼭 확인해주세요</b>
             <p>
               본 결과는 입력된 재무정보와 회사 현황을 바탕으로 해당 법인이 법원의 법인회생절차를 검토할 필요성과
-              기초적인 가능성을 미리 살펴보는 예비진단입니다. 종합 검토지수는 법원의 개시·인가 확률이 아니며,
+              기초적인 가능성을 미리 살펴보는 예비진단입니다. 신청 통과 가능성 점수는 법원의 실제 승인 확률이 아니며,
               법원의 판단을 보장하거나 법률·회계 자문을 대신하지 않습니다. 실제 신청 전에는 변호사·회계사 등
               전문가가 채무구조, 담보권, 현금흐름, 청산가치, 계속기업가치와 회생계획 수행 가능성을 종합 검토해야 합니다.
             </p>
@@ -268,6 +271,6 @@
       </footer>
     </div>
 
-    <script type="module" src="./app.js?v=20260806-7"></script>
+    <script type="module" src="./app.js?v=20260806-8"></script>
   </body>
 </html>
