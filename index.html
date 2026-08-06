@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="재무제표 PDF를 브라우저에서 분석하고 법인회생 검토 필요성을 확인하는 예비진단 도구"
+    />
+    <meta name="color-scheme" content="light" />
+    <title>법인회생 가능성 예비진단</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="topbar">
+        <a class="brand" href="#top" aria-label="법인회생 가능성 예비진단 처음으로">
+          <span class="brand-mark" aria-hidden="true">R</span>
+          <span>
+            <strong>회생가능성 진단</strong>
+            <small>Corporate Recovery Check</small>
+          </span>
+        </a>
+        <div class="secure-note"><span aria-hidden="true">●</span> 문서는 브라우저에서만 처리됩니다</div>
+      </header>
+
+      <main id="top">
+        <section class="hero" aria-labelledby="page-title">
+          <div class="eyebrow"><span>2</span> 재무자료 기반 간편진단</div>
+          <h1 id="page-title">회생의 가능성,<br /><em>숫자에서 먼저 확인하세요.</em></h1>
+          <p>
+            재무제표 PDF에서 주요 지표를 찾아 지급불능 위험과 계속기업 가능성을 함께 살펴봅니다.
+            약 3분이면 검토 방향을 확인할 수 있습니다.
+          </p>
+          <ol class="steps" aria-label="진단 단계">
+            <li class="active" data-step="1"><b>1</b><span>PDF 업로드</span></li>
+            <li data-step="2"><b>2</b><span>수치 확인</span></li>
+            <li data-step="3"><b>3</b><span>예비진단</span></li>
+          </ol>
+        </section>
+
+        <section class="workspace-card" id="upload-section" aria-labelledby="upload-title">
+          <div class="section-heading">
+            <div>
+              <span class="section-number">01</span>
+              <h2 id="upload-title">재무제표를 올려주세요</h2>
+              <p>재무상태표와 손익계산서가 포함된 PDF를 권장합니다.</p>
+            </div>
+            <span class="time-chip">예상 3분</span>
+          </div>
+
+          <label class="dropzone" id="dropzone" for="pdf-file">
+            <input id="pdf-file" type="file" accept="application/pdf,.pdf" />
+            <span class="upload-icon" aria-hidden="true">↑</span>
+            <strong>PDF 파일을 여기에 놓거나 선택하세요</strong>
+            <span>최대 25MB · 재무제표 PDF만 가능</span>
+            <span class="file-button">파일 선택</span>
+          </label>
+
+          <div class="upload-status" id="upload-status" role="status" aria-live="polite" hidden>
+            <span class="status-icon" aria-hidden="true">✓</span>
+            <div>
+              <strong id="status-title">파일을 확인했습니다</strong>
+              <span id="status-detail"></span>
+            </div>
+            <button class="text-button" id="remove-file" type="button">다시 선택</button>
+          </div>
+
+          <div class="privacy-row">
+            <p><b>외부 전송 없음</b><span>파일은 저장하거나 서버로 보내지 않습니다.</span></p>
+            <p><b>자동 삭제</b><span>페이지를 닫으면 분석 내용이 사라집니다.</span></p>
+            <p><b>검토 후 진단</b><span>추출된 숫자를 직접 확인할 수 있습니다.</span></p>
+          </div>
+
+          <div class="sample-row">
+            <span>PDF가 아직 없으신가요?</span>
+            <button class="link-button" id="sample-button" type="button">샘플 수치로 먼저 체험하기 →</button>
+          </div>
+        </section>
+
+        <section class="workspace-card verify-card" id="verify-section" aria-labelledby="verify-title" hidden>
+          <div class="section-heading">
+            <div>
+              <span class="section-number">02</span>
+              <h2 id="verify-title">추출된 수치를 확인해주세요</h2>
+              <p>자동 추출은 표 구조에 따라 오차가 있을 수 있습니다. 결산서와 다른 값은 수정해주세요.</p>
+            </div>
+            <span class="review-chip">직접 수정 가능</span>
+          </div>
+
+          <form id="diagnosis-form">
+            <div class="meta-grid">
+              <label>
+                <span>회사명 <small>(선택)</small></span>
+                <input id="company-name" name="companyName" type="text" placeholder="예: 주식회사 새봄" />
+              </label>
+              <label>
+                <span>기준연도</span>
+                <input id="fiscal-year" name="fiscalYear" type="number" min="2000" max="2100" />
+              </label>
+              <label>
+                <span>금액 단위</span>
+                <select id="amount-unit" name="amountUnit">
+                  <option value="1">원</option>
+                  <option value="1000">천원</option>
+                  <option value="1000000" selected>백만원</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="form-section-title">
+              <h3>핵심 재무정보</h3>
+              <span>음수는 - 기호로 입력</span>
+            </div>
+            <div class="metric-grid">
+              <label><span>유동자산</span><div class="amount-input"><input name="currentAssets" inputmode="decimal" placeholder="0" /><i>단위 적용</i></div></label>
+              <label><span>유동부채</span><div class="amount-input"><input name="currentLiabilities" inputmode="decimal" placeholder="0" /><i>단위 적용</i></div></label>
+              <label><span>자산총계</span><div class="amount-input"><input name="totalAssets" inputmode="decimal" placeholder="0" required /><i>단위 적용</i></div></label>
+              <label><span>부채총계</span><div class="amount-input"><input name="totalLiabilities" inputmode="decimal" placeholder="0" required /><i>단위 적용</i></div></label>
+              <label><span>매출액</span><div class="amount-input"><input name="revenue" inputmode="decimal" placeholder="0" required /><i>단위 적용</i></div></label>
+              <label><span>영업이익(손실)</span><div class="amount-input"><input name="operatingProfit" inputmode="decimal" placeholder="0" /><i>단위 적용</i></div></label>
+              <label><span>당기순이익(손실)</span><div class="amount-input"><input name="netIncome" inputmode="decimal" placeholder="0" /><i>단위 적용</i></div></label>
+              <label><span>현금 및 현금성자산</span><div class="amount-input"><input name="cash" inputmode="decimal" placeholder="0" /><i>단위 적용</i></div></label>
+              <label><span>이자비용</span><div class="amount-input"><input name="interestExpense" inputmode="decimal" placeholder="0" /><i>단위 적용</i></div></label>
+              <label><span>영업활동 현금흐름</span><div class="amount-input"><input name="operatingCashFlow" inputmode="decimal" placeholder="0" /><i>단위 적용</i></div></label>
+            </div>
+
+            <div class="form-section-title situation-title">
+              <h3>현재 상황</h3>
+              <span>진단의 정확도를 높이는 항목입니다</span>
+            </div>
+            <div class="situation-grid">
+              <fieldset>
+                <legend>현재 영업을 계속하고 있나요?</legend>
+                <div class="choice-pills">
+                  <label><input type="radio" name="businessContinuing" value="yes" checked /><span>예</span></label>
+                  <label><input type="radio" name="businessContinuing" value="no" /><span>아니오</span></label>
+                </div>
+              </fieldset>
+              <fieldset>
+                <legend>최근 3개월 내 연체가 있나요?</legend>
+                <div class="choice-pills">
+                  <label><input type="radio" name="arrears" value="no" checked /><span>없음</span></label>
+                  <label><input type="radio" name="arrears" value="yes" /><span>있음</span></label>
+                </div>
+              </fieldset>
+              <fieldset>
+                <legend>가압류·강제집행이 진행 중인가요?</legend>
+                <div class="choice-pills">
+                  <label><input type="radio" name="attachment" value="no" checked /><span>아니오</span></label>
+                  <label><input type="radio" name="attachment" value="yes" /><span>예</span></label>
+                </div>
+              </fieldset>
+              <fieldset>
+                <legend>국세·지방세 체납이 있나요?</legend>
+                <div class="choice-pills">
+                  <label><input type="radio" name="taxArrears" value="no" checked /><span>없음</span></label>
+                  <label><input type="radio" name="taxArrears" value="yes" /><span>있음</span></label>
+                </div>
+              </fieldset>
+            </div>
+
+            <div class="form-actions">
+              <p><b>안내</b> 필수값은 자산총계, 부채총계, 매출액입니다.</p>
+              <button class="primary-button" type="submit">예비진단 결과 보기 <span>→</span></button>
+            </div>
+          </form>
+        </section>
+
+        <section class="result-section" id="result-section" aria-labelledby="result-title" hidden>
+          <div class="result-hero">
+            <div class="result-copy">
+              <span class="result-kicker" id="result-kicker">예비진단 완료</span>
+              <h2 id="result-title">회생절차 검토 가치가 <em>높습니다</em></h2>
+              <p id="result-summary"></p>
+              <div class="result-flags" id="result-flags"></div>
+            </div>
+            <div class="score-ring" id="score-ring" aria-label="종합 검토지수">
+              <span><b id="fit-score">0</b><i>/ 100</i></span>
+              <small>종합 검토지수</small>
+            </div>
+          </div>
+
+          <div class="result-grid">
+            <article class="result-card axis-card">
+              <div class="card-title"><span>01</span><h3>진단 축</h3></div>
+              <div class="axis-list">
+                <div><p><span>지급불능 위험</span><b id="distress-value">0</b></p><i><span id="distress-bar"></span></i></div>
+                <div><p><span>계속기업 가능성</span><b id="viability-value">0</b></p><i><span id="viability-bar"></span></i></div>
+                <div><p><span>구조조정 여력</span><b id="restructure-value">0</b></p><i><span id="restructure-bar"></span></i></div>
+              </div>
+            </article>
+
+            <article class="result-card ratio-card">
+              <div class="card-title"><span>02</span><h3>핵심 재무비율</h3></div>
+              <dl>
+                <div><dt>유동비율</dt><dd id="current-ratio">-</dd></div>
+                <div><dt>부채비율</dt><dd id="debt-ratio">-</dd></div>
+                <div><dt>영업이익률</dt><dd id="operating-margin">-</dd></div>
+                <div><dt>이자보상배율</dt><dd id="interest-coverage">-</dd></div>
+              </dl>
+            </article>
+
+            <article class="result-card findings-card">
+              <div class="card-title"><span>03</span><h3>주요 판단 근거</h3></div>
+              <ul id="findings-list"></ul>
+            </article>
+          </div>
+
+          <article class="next-step-card">
+            <div>
+              <span class="section-number">NEXT</span>
+              <h3>지금 준비하면 좋은 자료</h3>
+              <p>전문가 상담 전 아래 자료를 정리하면 회생 가능성과 자금계획을 더 빠르게 검토할 수 있습니다.</p>
+            </div>
+            <ol>
+              <li><b>01</b><span><strong>최근 3개년 재무자료</strong>재무제표·부가세 신고자료</span></li>
+              <li><b>02</b><span><strong>채권자 및 담보 목록</strong>금융기관·상거래채무·체납</span></li>
+              <li><b>03</b><span><strong>향후 13주 자금계획</strong>예상 매출·필수비용·상환일정</span></li>
+            </ol>
+          </article>
+
+          <div class="result-actions">
+            <button class="secondary-button" id="restart-button" type="button">처음부터 다시 진단</button>
+            <button class="primary-button" id="print-button" type="button">결과 인쇄·PDF 저장 <span>↗</span></button>
+          </div>
+
+          <div class="disclaimer">
+            <b>꼭 확인해주세요</b>
+            <p>
+              본 결과는 입력된 재무정보를 정량 기준으로 해석한 예비진단이며, 법원의 회생절차 개시·인가 가능성을
+              보장하거나 법률·회계 자문을 대신하지 않습니다. 실제 신청 전에는 변호사·회계사 등 전문가가 채무구조,
+              담보권, 현금흐름, 청산가치와 계속기업가치를 종합 검토해야 합니다.
+            </p>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <p>회생가능성 진단 <span>·</span> 재무자료 기반 예비검토</p>
+        <p>업로드한 파일과 입력값은 서버에 저장되지 않습니다.</p>
+      </footer>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
