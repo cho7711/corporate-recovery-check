@@ -93,6 +93,19 @@ main { width: min(1040px, calc(100% - 40px)); margin: 0 auto; }
 .privacy-row b { font-size: 11px; }
 .privacy-row span { margin-top: 2px; color: #84908c; font-size: 9px; }
 .sample-row { margin-top: 24px; padding-top: 22px; display: flex; justify-content: center; gap: 10px; border-top: 1px solid #edf0ed; color: var(--muted); font-size: 11px; }
+.sample-row { align-items: center; flex-wrap: wrap; }
+.sample-row .link-button {
+  min-height: 50px;
+  padding: 12px 22px;
+  border: 1px solid #a8cfc0;
+  border-radius: 11px;
+  background: var(--mint);
+  color: var(--deep);
+  box-shadow: 0 8px 20px rgba(19, 125, 104, .12);
+  font-size: 16px;
+  transition: .18s ease;
+}
+.sample-row .link-button:hover { background: #cae9de; transform: translateY(-1px); }
 .verify-card { padding-bottom: 38px; }
 .meta-grid { display: grid; grid-template-columns: 1.5fr .7fr .8fr; gap: 14px; }
 form label > span, .meta-grid label > span { display: block; margin-bottom: 7px; font-size: 11px; font-weight: 700; }
@@ -158,6 +171,15 @@ legend { padding: 0 5px; font-size: 10px; font-weight: 700; }
 .findings-card li { position: relative; padding-left: 19px; color: var(--muted); font-size: 10px; line-height: 1.55; word-break: keep-all; }
 .findings-card li::before { content: ""; position: absolute; top: 6px; left: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--mint); box-shadow: inset 0 0 0 2px var(--green); }
 .findings-card li.risk::before { background: #f7dfdb; box-shadow: inset 0 0 0 2px var(--danger); }
+.interpretation-card { margin-top: 24px; padding: 36px 40px; border: 1px solid #d9e5df; border-radius: 16px; background: white; box-shadow: var(--shadow); }
+.interpretation-heading { margin-bottom: 24px; }
+.interpretation-heading h3 { margin: 0; font: 700 23px/1.4 "Gowun Batang", Georgia, serif; }
+.interpretation-heading p { margin: 7px 0 0; color: var(--muted); font-size: 14px; }
+.interpretation-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.interpretation-grid section { padding: 22px; border-radius: 12px; background: #f7f9f6; }
+.interpretation-grid section > b { display: block; margin-bottom: 10px; color: var(--green); font: 700 11px/1 Arial, sans-serif; }
+.interpretation-grid strong { display: block; margin-bottom: 9px; font-size: 16px; }
+.interpretation-grid p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.75; word-break: keep-all; }
 .next-step-card { margin-top: 24px; padding: 34px 40px; display: grid; grid-template-columns: .9fr 1.4fr; gap: 36px; align-items: center; border: 1px solid #d9e5df; border-radius: 16px; background: var(--mint-light); }
 .next-step-card h3 { margin: 0; font: 700 21px/1.4 "Gowun Batang", Georgia, serif; }
 .next-step-card p { margin: 7px 0 0; color: var(--muted); font-size: 9px; }
@@ -184,6 +206,7 @@ footer p { margin: 0; } footer span { margin: 0 5px; }
   .result-grid { grid-template-columns: 1fr; }
   .result-card { min-height: 0; }
   .result-card + .result-card { border-left: 0; border-top: 1px solid var(--line); }
+  .interpretation-grid { grid-template-columns: 1fr; }
   .next-step-card { grid-template-columns: 1fr; }
 }
 
@@ -213,6 +236,8 @@ footer p { margin: 0; } footer span { margin: 0 5px; }
   .score-ring span { top: 41px; }
   .score-ring small { bottom: 30px; }
   .next-step-card { padding: 26px 21px; }
+  .interpretation-card { padding: 28px 21px; }
+  .interpretation-grid section { padding: 19px; }
   .next-step-card ol { grid-template-columns: 1fr; }
   .result-actions { flex-direction: column-reverse; }
   .result-actions button { width: 100%; }
@@ -278,5 +303,6 @@ footer { font-size: 13px; }
   main { width: 100%; }
   .result-section { margin: 0; }
   .result-hero, .result-card, .next-step-card { break-inside: avoid; }
+  .interpretation-card { break-inside: avoid; }
   .result-hero { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }
